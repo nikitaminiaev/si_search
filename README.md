@@ -16,6 +16,13 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000
 sudo systemctl start si-archive-api.service
 ```
 
+## API
+
+```
+GET /api/search?q={запрос}&limit=20&offset=0
+GET /api/file/{md5}
+```
+
 ## Данные
 
 - Книжные файлы: `/mnt/hdd/libgen/libgen/`
