@@ -9,6 +9,4 @@ __pycache__/
 *.rar
 *.aria2
 libgen_is_db/
-database/**/*.dat.gz
-database/**/*.rar
-database/**/*.aria2
+database/mysql/
