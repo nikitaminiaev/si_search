@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LibGen Search</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f5f5f5;color:#333;padding:20px}
+.container{max-width:960px;margin:0 auto}
+h1{font-size:1.5rem;margin-bottom:16px;color:#1a1a1a}
+.search-box{display:flex;gap:8px;margin-bottom:20px}
+.search-box input{flex:1;padding:10px 14px;font-size:1rem;border:1px solid #ccc;border-radius:6px;outline:0}
+.search-box input:focus{border-color:#2563eb;box-shadow:0 0 0 3px rgba(37,99,235,.15)}
+.search-box button{padding:10px 24px;font-size:1rem;background:#2563eb;color:#fff;border:0;border-radius:6px;cursor:pointer}
+.search-box button:hover{background:#1d4ed8}
+.search-box button:disabled{opacity:.6;cursor:default}
+.total{margin-bottom:12px;font-size:.9rem;color:#666}
+table{width:100%;border-collapse:collapse;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+th,td{text-align:left;padding:10px 12px;border-bottom:1px solid #eee;font-size:.9rem}
+th{background:#fafafa;font-weight:600;color:#555;white-space:nowrap}
+tr:hover{background:#f8faff}
+.title-col{max-width:360px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.title-col a{color:inherit;text-decoration:none;display:block}
+.title-col a:hover{color:#2563eb}
+.author-col{max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ext-col{text-transform:uppercase;font-size:.8rem;color:#666}
+.size-col{white-space:nowrap;text-align:right;font-variant-numeric:tabular-nums}
+.pagination{display:flex;justify-content:center;gap:8px;margin-top:16px}
+.pagination button{padding:8px 16px;border:1px solid #ccc;border-radius:6px;background:#fff;cursor:pointer;font-size:.9rem}
+.pagination button:hover{background:#f0f0f0}
+.pagination button:disabled{opacity:.4;cursor:default}
+.page-info{padding:8px 0;font-size:.9rem;color:#666}
+.error{color:#dc2626;margin-bottom:12px;font-size:.9rem}
+.loader{text-align:center;padding:40px;color:#999;font-size:.9rem}
+@media(max-width:640px){table{font-size:.8rem}th,td{padding:6px 8px}.title-col{max-width:180px}.author-col{max-width:120px}}
+</style>
+</head>
+<body>
+<div class="container">
+<h1>LibGen Search</h1>
+<div class="search-box">
+<input id="q" type="text" placeholder="Название или автор..." autofocus>
+<button id="searchBtn" onclick="doSearch()">Поиск</button>
+</div>
+<div id="error" class="error"></div>
+<div id="total" class="total"></div>
+<div id="results"></div>
+<div id="pagination" class="pagination"></div>
+</div>
+<script>
+let state={query:'',offset:0,limit:20,total:0};
+
+document.getElementById('q').addEventListener('keydown',e=>{if(e.key==='Enter')doSearch()});
+
+async function doSearch(offset){
+offset=offset||0;
+const q=document.getElementById('q').value.trim();
+if(!q)return;
+state.query=q;state.offset=offset;
+const btn=document.getElementById('searchBtn');
+btn.disabled=true;btn.textContent='Поиск...';
+document.getElementById('error').textContent='';
+try{
+const r=await fetch('/api/search?q='+encodeURIComponent(q)+'&limit='+state.limit+'&offset='+offset);
+if(!r.ok)throw new Error('Ошибка '+r.status);
+const d=await r.json();
+state.total=d.total;
+render(d);
+}catch(e){
+document.getElementById('error').textContent='Ошибка: '+e.message;
+document.getElementById('results').innerHTML='';
+document.getElementById('pagination').innerHTML='';
+}finally{
+btn.disabled=false;btn.textContent='Поиск';
+}
+}
+
+function render(d){
+const totalEl=document.getElementById('total');
+totalEl.textContent=d.total>0?'Найдено: '+d.total:'Ничего не найдено';
+
+const container=document.getElementById('results');
+if(!d.results||!d.results.length){container.innerHTML='';document.getElementById('pagination').innerHTML='';return}
+
+let html='<table><thead><tr><th>Название</th><th>Автор</th><th>Год</th><th>Язык</th><th></th><th>Размер</th></tr></thead><tbody>';
+for(const r of d.results){
+const size=formatSize(r.Filesize);
+html+='<tr><td class="title-col"><a href="/api/file/'+r.MD5+'" title="'+esc(r.Title)+'">'+esc(r.Title)+'</a></td>'+
+'<td class="author-col" title="'+esc(r.Author)+'">'+esc(r.Author)+'</td>'+
+'<td>'+esc(r.Year)+'</td>'+
+'<td>'+esc(r.Language)+'</td>'+
+'<td class="ext-col">'+esc(r.Extension)+'</td>'+
+'<td class="size-col">'+size+'</td></tr>';
+}
+html+='</tbody></table>';
+container.innerHTML=html;
+
+renderPagination();
+}
+
+function renderPagination(){
+const el=document.getElementById('pagination');
+if(state.total<=state.limit){el.innerHTML='';return}
+const totalPages=Math.ceil(state.total/state.limit);
+const currentPage=Math.floor(state.offset/state.limit)+1;
+let html='<button onclick="doSearch(0)"'+(state.offset<=0?' disabled':'')+'>&#xAB;</button>';
+html+='<button onclick="doSearch('+(state.offset-state.limit)+')"'+(state.offset<=0?' disabled':'')+'>&#x2039;</button>';
+html+='<span class="page-info">'+currentPage+'/'+totalPages+'</span>';
+html+='<button onclick="doSearch('+(state.offset+state.limit)+')"'+(state.offset+state.limit>=state.total?' disabled':'')+'>&#x203A;</button>';
+html+='<button onclick="doSearch('+(Math.floor((state.total-1)/state.limit)*state.limit)+')"'+(state.offset+state.limit>=state.total?' disabled':'')+'>&#xBB;</button>';
+el.innerHTML=html;
+}
+
+function formatSize(bytes){
+if(!bytes)return'';
+const units=['B','KB','MB','GB'];
+let i=0;let size=bytes;
+while(size>=1024&&i<3){size/=1024;i++}
+return size.toFixed(i===0?0:1)+' '+units[i];
+}
+
+function esc(s){if(!s)return'';const d=document.createElement('div');d.appendChild(document.createTextNode(s));return d.innerHTML}
+</script>
+</body>
+</html>

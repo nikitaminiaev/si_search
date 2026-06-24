@@ -1,0 +1,11 @@
+venv/
+.env
+__pycache__/
+*.pyc
+*.pyo
+.DS_Store
+*.dat
+*.dat.gz
+*.rar
+*.aria2
+libgen_is_db/
